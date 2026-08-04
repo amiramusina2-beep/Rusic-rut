@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "oiyres-rut"
+version = "0.5.0"
+description = "Официальный музыкальный ИИ-пакет Oiyres Company"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "requests",
+    "flask"
+]
+
+[tool.setuptools]
+packages = ["oiyres"]

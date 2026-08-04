@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Oiyres Company - Rut 0.5 Pro</title>
+    <script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #0d1117; color: #c9d1d9; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .container { width: 100%; max-width: 650px; background: #161b22; padding: 20px; border-radius: 12px; border: 1px solid #30363d; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+        h2 { color: #58a6ff; margin-top: 0; text-align: center; font-size: 22px; }
+        .subtitle { text-align: center; color: #8b949e; font-size: 13px; margin-bottom: 15px; }
+        
+        .top-panel { background: #0d1117; padding: 12px 15px; border-radius: 8px; border: 1px solid #30363d; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; font-size: 14px; }
+        .checkbox-container { display: flex; align-items: center; gap: 8px; cursor: pointer; color: #58a6ff; font-weight: bold; }
+        .checkbox-container input { width: 16px; height: 16px; cursor: pointer; }
+
+        .chat-box { height: 330px; border: 1px solid #30363d; border-radius: 8px; background: #0d1117; overflow-y: auto; padding: 15px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 12px; }
+        .message { padding: 10px 14px; border-radius: 8px; max-width: 85%; line-height: 1.4; font-size: 14px; }
+        .user-msg { background: #1f6feb; color: white; align-self: flex-end; }
+        .ai-msg { background: #21262d; color: #c9d1d9; align-self: flex-start; border: 1px solid #30363d; display: flex; flex-direction: column; gap: 8px; }
+        
+        .input-area { display: flex; gap: 10px; }
+        input[type="text"] { flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #30363d; background: #0d1117; color: white; font-size: 14px; }
+        input[type="text"]:focus { border-color: #58a6ff; outline: none; }
+        button { padding: 12px 20px; background: #238636; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        button:hover { background: #2ea043; }
+        
+        .actions { display: flex; gap: 8px; margin-top: 5px; }
+        .btn-action { padding: 5px 10px; border-radius: 4px; font-size: 12px; text-decoration: none; border: none; cursor: pointer; font-weight: bold; color: white; }
+        .play { background: #238636; }
+        .dl { background: #1f6feb; }
+        
+        .footer-status { font-size: 12px; color: #8b949e; text-align: center; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Oiyres Company</h2>
+    <div class="subtitle">Модель: Rut 0.5 Pro (Чистый студийный звук + Встроенный API Search)</div>
+
+    <!-- Переключатель поиска DuckDuckGo -->
+    <div class="top-panel">
+        <label class="checkbox-container">
+            <input type="checkbox" id="searchToggle" checked>
+            🦆 Искать через DuckDuckGo API
+        </label>
+        <span style="font-size: 12px; color: #8b949e;">Native Search</span>
+    </div>
+
+    <div class="chat-box" id="chatBox">
+        <div class="message ai-msg">
+            Привет! Я <b>Rut 0.5 Pro</b>. Никаких сторонних тяжелых библиотек — используем встроенный чистый API. Звук чистый, без эха. Попробуй ввести запрос с включенной или выключенной галочкой поиска!
+        </div>
+    </div>
+
+    <div class="input-area">
+        <input type="text" id="userInput" placeholder="Напиши запрос для трека..." onkeypress="handleKeyPress(event)">
+        <button onclick="sendPrompt()">Отправить</button>
+    </div>
+    
+    <div class="footer-status">📁 Песен в локальной базе папки music/: <span id="songCount" style="color: #3fb950; font-weight: bold;">{{ total_songs }}</span></div>
+</div>
+
+<script>
+    let audioCtx = null;
+
+    function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+    }
+
+    // Чистый мультиинструментальный проигрыватель без эха
+    function playCleanSong(tracks, tempo) {
+        initAudio();
+        if (audioCtx.state === 'suspended') { audioCtx.resume(); }
+        const noteDuration = 60 / (tempo || 120);
+
+        const masterGain = audioCtx.createGain();
+        masterGain.gain.setValueAtTime(1.2, audioCtx.currentTime);
+        masterGain.connect(audioCtx.destination);
+
+        for (const [instrumentName, notes] of Object.entries(tracks)) {
+            Soundfont.instrument(audioCtx, instrumentName).then(synth => {
+                notes.forEach((note, index) => {
+                    setTimeout(() => {
+                        if (audioCtx) {
+                            try {
+                                synth.play(note, audioCtx.currentTime, { duration: noteDuration });
+                            } catch(e) {}
+                        }
+                    }, index * noteDuration * 1000);
+                });
+            }).catch(err => {
+                console.log("Инструмент загружается: " + instrumentName);
+            });
+        }
+    }
+
+    function appendMessage(text, sender) {
+        const chatBox = document.getElementById('chatBox');
+        const msg = document.createElement('div');
+        msg.className = `message ${sender === 'user' ? 'user-msg' : 'ai-msg'}`;
+        msg.innerHTML = text;
+        chatBox.appendChild(msg);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    async function sendPrompt() {
+        const input = document.getElementById('userInput');
+        const prompt = input.value.trim();
+        if (!prompt) return;
+
+        const useSearch = document.getElementById('searchToggle').checked;
+
+        appendMessage(prompt, 'user');
+        input.value = '';
+
+        let loadingText = useSearch ? "🦆 Запрос к DuckDuckGo API, Rut 0.5 компонует трек..." : "🧠 Rut 0.5 генерирует чистый трек из базы...";
+        appendMessage(loadingText, 'ai');
+        const processingMsg = document.getElementById('chatBox').lastChild;
+
+        try {
+            let res = await fetch('/generate_pure_autonomous', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({prompt, use_search: useSearch})
+            });
+            let data = await res.json();
+
+            if (data.status === 'success') {
+                processingMsg.remove();
+                
+                let instrumentsList = Object.keys(data.song.tracks).join(', ');
+                let searchBadge = data.searched ? ' <span style="color:#58a6ff;">[🌐 С Web-контекстом]</span>' : '';
+
+                const aiResponseHTML = `
+                    🎵 <b>${data.song.title}</b>${searchBadge}<br>
+                    <small>🪕 Инструменты: <b>${instrumentsList}</b><br>⏱ Темп: ${data.song.tempo} BPM</small>
+                    <div class="actions">
+                        <button class="btn-action play" onclick='playCleanSong(${JSON.stringify(data.song.tracks)}, ${data.song.tempo})'>▶ Слушать чистый трек</button>
+                        <a class="btn-action dl" href="/download_json/${data.filename}">📥 Скачать JSON</a>
+                    </div>
+                `;
+                appendMessage(aiResponseHTML, 'ai');
+                document.getElementById('songCount').innerText = data.total_songs;
+            } else {
+                processingMsg.innerHTML = "❌ Ошибка генерации.";
+            }
+        } catch (err) {
+            processingMsg.innerHTML = "❌ Ошибка связи с локальным сервером.";
+        }
+    }
+
+    function handleKeyPress(e) {
+        if (e.key === 'Enter') sendPrompt();
+    }
+</script>
+
+</body>
+</html>
